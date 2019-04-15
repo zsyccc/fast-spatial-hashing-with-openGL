@@ -2,11 +2,10 @@ cmake_minimum_required(VERSION 3.0)
 
 project(psh_proj)
 
-set(CMAKE_CXX_STANDARD 17)
 find_package(OpenGL REQUIRED)
 
 if( CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR )
-    message( FATAL_ERROR "Please select another Build Directory ! (and give it a clever name, like bin_Visual2012_64bits/)" )
+    message( FATAL_ERROR "Please select another Build Directory ! (and give it a clever name, like build/)" )
 endif()
 if( CMAKE_SOURCE_DIR MATCHES " " )
 	message( "Your Source Directory contains spaces. If you experience problems when compiling, this can be the cause." )
@@ -16,6 +15,9 @@ if( CMAKE_BINARY_DIR MATCHES " " )
 endif()
 
 add_subdirectory (external)
+
+set(CMAKE_CXX_STANDARD 17)
+
 include_directories(
 	external/AntTweakBar-1.16/include/
 	external/glfw-3.1.2/include/
@@ -35,19 +37,14 @@ set(filelists
 	models/dragon.obj
 	models/fish_512.obj
 	models/suzanne.obj
-	models/teapot.obj
 )
 
 add_executable(psh_proj
-	playground.cpp
-	# main.cpp
-	point.hpp
-	psh.hpp
-	util.hpp
-	tiny_obj_loader.h
+	main.cpp
 	tiny_obj_loader.cpp
-	voxelizer.h
+	tiny_obj_loader.h
 	voxelizer.cpp
+	voxelizer.h
 	common/shader.hpp
 	common/shader.cpp
 	common/texture.hpp
