@@ -30,15 +30,18 @@ using namespace glm;
 #include <thread>
 
 #include <set>
+#include <cassert>
 
 using std::cout, std::endl;
 
 int main(int argc, char** argv) {
+    tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
     std::string err;
-    bool ret =
-        tinyobj::LoadObj(shapes, materials, err, "models/bunny.obj", NULL);
+    std::string warn;
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
+                                "models/cube.obj");
 
     if (!err.empty()) {
         std::cerr << err << std::endl;
@@ -52,35 +55,96 @@ int main(int argc, char** argv) {
     size_t noffset = 0;
 
     std::vector<vx_vertex_t> vertexes;
-    float res = 0.0025;
-    float precision = 0.001;
-
-    for (size_t i = 0; i < shapes.size(); i++) {
-        vx_mesh_t* mesh;
-
-        mesh = vx_mesh_alloc(shapes[i].mesh.positions.size(),
-                             shapes[i].mesh.indices.size());
-
-        for (size_t f = 0; f < shapes[i].mesh.indices.size(); f++) {
-            mesh->indices[f] = shapes[i].mesh.indices[f];
-                }
-        for (size_t v = 0; v < shapes[i].mesh.positions.size() / 3; v++) {
-            mesh->vertices[v].x = shapes[i].mesh.positions[3 * v + 0];
-            mesh->vertices[v].y = shapes[i].mesh.positions[3 * v + 1];
-            mesh->vertices[v].z = shapes[i].mesh.positions[3 * v + 2];
-        }
-
-        vx_point_cloud_t* result;
-        result = vx_voxelize_pc(mesh, res, res, res, precision);
-
-        printf("Number of vertices: %ld\n", result->nvertices);
-        for (int i = 0; i < result->nvertices; i++) {
-            vertexes.push_back(result->vertices[i]);
-        }
-
-        vx_point_cloud_free(result);
-        vx_mesh_free(mesh);
+    float res = 0.025;
+    float precision = 0.01;
+    int nvertices = attrib.vertices.size();
+    int nindices = 0;
+    for (size_t s = 0; s < shapes.size(); s++) {
+        nindices += shapes[s].mesh.indices.size();
     }
+
+    vx_mesh_t* mesh = vx_mesh_alloc(nvertices, nindices);
+
+    for (size_t s = 0; s < shapes.size(); s++) {
+        // Loop over faces(polygon)
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            int fv = shapes[s].mesh.num_face_vertices[f];
+
+            // Loop over vertices in the face.
+            for (size_t v = 0; v < fv; v++) {
+                // access to vertex
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+                mesh->indices[index_offset + v] = idx.vertex_index;
+                mesh->normalindices[index_offset + v] = idx.normal_index;
+                mesh->vertices[idx.vertex_index].x =
+                    attrib.vertices[3 * idx.vertex_index + 0];
+                mesh->vertices[idx.vertex_index].y =
+                    attrib.vertices[3 * idx.vertex_index + 1];
+                mesh->vertices[idx.vertex_index].z =
+                    attrib.vertices[3 * idx.vertex_index + 2];
+                mesh->normals[idx.normal_index].x =
+                    attrib.normals[3 * idx.normal_index + 0];
+                mesh->normals[idx.normal_index].y =
+                    attrib.normals[3 * idx.normal_index + 1];
+                mesh->normals[idx.normal_index].z =
+                    attrib.normals[3 * idx.normal_index + 2];
+            }
+            index_offset += fv;
+
+            // per-face material
+            shapes[s].mesh.material_ids[f];
+        }
+    }
+
+    vx_mesh_t* result = vx_voxelize(mesh, res, res, res, precision);
+    printf("Number of vertices: %ld\n", result->nvertices);
+    // for (int i = 0; i < result->nvertices; i++) {
+    //     vertexes.push_back(result->vertices[i]);
+    // }
+    for (int j = 0; j < 30; j++) {
+        size_t i0 = voffset + result->indices[j];
+        // size_t i1 = voffset + result->indices[j + 1];
+        // size_t i2 = voffset + result->indices[j + 2];
+
+        size_t vn0 = result->normalindices[j];
+        // size_t vn1 = result->normalindices[j + 1];
+        // size_t vn2 = result->normalindices[j + 2];
+        vx_vertex_t v = result->vertices[i0];
+        vx_vertex_t vn = result->normals[vn0];
+        cout << v.x << ' ' << v.y << ' ' << v.z << ' ';
+        cout << vn.x << ' ' << vn.y << ' ' << vn.z << endl;
+        // vx_vertex_t vn = result->normals[vn0];
+        // float zoom = 0.0f;
+        // vx_vertex_t p = {v.x + zoom * vn.x, v.y + zoom * vn.y,
+        //                  v.z + zoom * vn.z};
+        // vertexes.push_back(p);
+    }
+
+    // for (int i = 0; i < result->nnormals; i++) {
+    //     cout << result->normals[i].x << ' ' << result->normals[i].y << ' '
+    //          << result->normals[i].z << endl;
+    // }
+    // for (int i = 0; i < 20; i++) {
+    //     cout << result->indices[i] << ' ' << result->normalindices[i] <<
+    //     endl;
+    // }
+    // for (int i = 0; i < result->nvertices; i++) {
+    // int index = result->indices[i];
+    // int nindex = result->normalindices[i];
+    // vx_vertex_t v = result->vertices[index];
+    // vx_vertex_t vn = result->normals[index];
+    // cout << v.x << ' ' << v.y << ' ' << v.z << ' ' << vn.x << ' ' << vn.y
+    //      << ' ' << vn.z << endl;
+    // vx_vertex_t p = {v.x + vn.x * 0.1f, v.y + vn.y * 0.1f,
+    //                  v.z + vn.z * 0.1f};
+    // vertexes.push_back(p);
+    // }
+
+    cout << result->nindices << endl;
+
+    vx_mesh_free(mesh);
+    vx_mesh_free(result);
 
     // Initialise GLFW
     if (!glfwInit()) {

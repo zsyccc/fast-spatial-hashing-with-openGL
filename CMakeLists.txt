@@ -58,6 +58,7 @@ add_executable(psh_proj
 add_definitions(
 	-DNDEBUG
 	-D_CONSOLE
+	-g
 )
 
 target_link_libraries(${PROJECT_NAME}
