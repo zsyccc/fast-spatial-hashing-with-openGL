@@ -88,8 +88,9 @@ typedef struct vx_mesh {
 typedef struct vx_point_cloud {
     vx_vertex_t* vertices;  // Contiguous point cloud vertices positions, each
                             // vertex corresponds to the center of a voxel
-    vx_color_t* colors;  // Contiguous point cloud vertices colors
-    size_t nvertices;    // The number of vertices in the point cloud
+    vx_color_t* colors;     // Contiguous point cloud vertices colors
+    size_t nvertices;       // The number of vertices in the point cloud
+    vx_vec3_t* normals;
 } vx_point_cloud_t;
 
 // vx_voxelize_pc: Voxelizes a triangle mesh to a point cloud
@@ -171,6 +172,7 @@ void vx_point_cloud_free(vx_point_cloud_t* pointcloud);
 
 #endif  // VOXELIZER_H
 
+// #define VOXELIZER_IMPLEMENTATION
 #ifdef VOXELIZER_IMPLEMENTATION
 
 #include <math.h>     // ceil, fabs & al.
@@ -231,6 +233,7 @@ typedef struct vx_hash_table {
 
 typedef struct vx_voxel_data {
     vx_vec3_t position;
+    vx_vec3_t normal;
     vx_color_t color;
 } vx_voxel_data_t;
 
@@ -350,7 +353,7 @@ float vx__map_to_voxel(float position, float voxelSize, bool min) {
     return (min ? floor(vox) : ceil(vox)) * voxelSize;
 }
 
-vx_vec3_t vx__vec3_cross(vx_vec3_t* v1, vx_vec3_t* v2) {
+vx_vec3_t vx__vec3_cross(const vx_vec3_t* v1, const vx_vec3_t* v2) {
     vx_vec3_t cross;
     cross.x = v1->y * v2->z - v1->z * v2->y;
     cross.y = v1->z * v2->x - v1->x * v2->z;
@@ -368,7 +371,7 @@ bool vx__vertex_comp_func(void* a, void* b) {
     return vx__vertex_equals_epsilon((vx_vertex_t*)a, (vx_vertex_t*)b);
 }
 
-void vx__vec3_sub(vx_vec3_t* a, vx_vec3_t* b) {
+void vx__vec3_sub(vx_vec3_t* a, const vx_vec3_t* b) {
     a->x -= b->x;
     a->y -= b->y;
     a->z -= b->z;
@@ -392,6 +395,16 @@ void vx__vec3_multiply(vx_vec3_t* a, float v) {
 
 float vx__vec3_dot(vx_vec3_t* v1, vx_vec3_t* v2) {
     return v1->x * v2->x + v1->y * v2->y + v1->z * v2->z;
+}
+
+void vx__vec3_normalize(vx_vec3_t* v) {
+    float sqr = v->x * v->x + v->y * v->y + v->z * v->z;
+    if (sqr != 0) {
+        float z = sqrtf(sqr);
+        v->x /= z;
+        v->y /= z;
+        v->z /= z;
+    }
 }
 
 int vx__plane_box_overlap(vx_vec3_t* normal, float d,
@@ -768,11 +781,19 @@ vx_hash_table_t* vx__voxelize(vx_mesh_t const* m, vx_vertex_t vs,
 
                         nodedata = VX_MALLOC(vx_voxel_data_t, 1);
 
+                        v1 = triangle.p1;
+                        v2 = triangle.p2;
+                        v3 = triangle.p3;
+
+                        vx_vec3_t p1 = v1;
+                        vx__vec3_sub(&p1, &v3);
+                        vx_vec3_t p2 = v2;
+                        vx__vec3_sub(&p2, &v3);
+                        vx_vec3_t n = vx__vec3_cross(&p1, &p2);
+                        vx__vec3_normalize(&n);
+                        nodedata->normal = n;
                         if (m->colors != NULL) {
                             // Perform barycentric interpolation of colors
-                            v1 = triangle.p1;
-                            v2 = triangle.p2;
-                            v3 = triangle.p3;
 
                             c1 = triangle.colors[0];
                             c2 = triangle.colors[1];
@@ -890,6 +911,7 @@ vx_point_cloud_t* vx_voxelize_pc(vx_mesh_t const* mesh, float voxelsizex,
 
     pc = VX_MALLOC(vx_point_cloud_t, 1);
     pc->vertices = VX_MALLOC(vx_vec3_t, voxels);
+    pc->normals = VX_MALLOC(vx_vec3_t, voxels);
     pc->colors = mesh->colors != NULL ? VX_MALLOC(vx_color_t, voxels) : NULL;
     pc->nvertices = 0;
 
@@ -906,6 +928,7 @@ vx_point_cloud_t* vx_voxelize_pc(vx_mesh_t const* mesh, float voxelsizex,
             if (pc->colors) {
                 pc->colors[pc->nvertices] = voxeldata->color;
             }
+            pc->normals[pc->nvertices] = voxeldata->normal;
             pc->vertices[pc->nvertices++] = voxeldata->position;
 
             node = node->next;
