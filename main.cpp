@@ -54,7 +54,6 @@ int main(int argc, char** argv) {
     size_t voffset = 0;
     size_t noffset = 0;
 
-    std::vector<vx_vertex_t> vertexes;
     float res = 0.025;
     float precision = 0.01;
     int nvertices = attrib.vertices.size();
@@ -97,54 +96,29 @@ int main(int argc, char** argv) {
         }
     }
 
-    vx_mesh_t* result = vx_voxelize(mesh, res, res, res, precision);
-    printf("Number of vertices: %ld\n", result->nvertices);
-    // for (int i = 0; i < result->nvertices; i++) {
-    //     vertexes.push_back(result->vertices[i]);
-    // }
-    for (int j = 0; j < 30; j++) {
-        size_t i0 = voffset + result->indices[j];
-        // size_t i1 = voffset + result->indices[j + 1];
-        // size_t i2 = voffset + result->indices[j + 2];
+    std::vector<vx_vertex_t> vertexes;
+    std::vector<vx_vec3_t> normals;
 
-        size_t vn0 = result->normalindices[j];
-        // size_t vn1 = result->normalindices[j + 1];
-        // size_t vn2 = result->normalindices[j + 2];
-        vx_vertex_t v = result->vertices[i0];
-        vx_vertex_t vn = result->normals[vn0];
-        cout << v.x << ' ' << v.y << ' ' << v.z << ' ';
-        cout << vn.x << ' ' << vn.y << ' ' << vn.z << endl;
-        // vx_vertex_t vn = result->normals[vn0];
-        // float zoom = 0.0f;
-        // vx_vertex_t p = {v.x + zoom * vn.x, v.y + zoom * vn.y,
-        //                  v.z + zoom * vn.z};
-        // vertexes.push_back(p);
+    vx_point_cloud_t* result = vx_voxelize_pc(mesh, res, res, res, precision);
+
+    printf("Number of vertices: %ld\n", result->nvertices);
+    for (int i = 0; i < result->nvertices; i++) {
+        vertexes.push_back(result->vertices[i]);
+        normals.push_back(result->normals[i]);
     }
 
-    // for (int i = 0; i < result->nnormals; i++) {
-    //     cout << result->normals[i].x << ' ' << result->normals[i].y << ' '
-    //          << result->normals[i].z << endl;
-    // }
-    // for (int i = 0; i < 20; i++) {
-    //     cout << result->indices[i] << ' ' << result->normalindices[i] <<
-    //     endl;
-    // }
-    // for (int i = 0; i < result->nvertices; i++) {
-    // int index = result->indices[i];
-    // int nindex = result->normalindices[i];
-    // vx_vertex_t v = result->vertices[index];
-    // vx_vertex_t vn = result->normals[index];
-    // cout << v.x << ' ' << v.y << ' ' << v.z << ' ' << vn.x << ' ' << vn.y
-    //      << ' ' << vn.z << endl;
-    // vx_vertex_t p = {v.x + vn.x * 0.1f, v.y + vn.y * 0.1f,
-    //                  v.z + vn.z * 0.1f};
-    // vertexes.push_back(p);
-    // }
-
-    cout << result->nindices << endl;
-
     vx_mesh_free(mesh);
-    vx_mesh_free(result);
+    vx_point_cloud_free(result);
+
+    int nv = vertexes.size();
+    for (int i = 0; i < nv; i++) {
+        vx_vertex_t& v = vertexes[i];
+        const vx_vec3_t& vn = normals[i];
+        float zoom = 0.2f;
+        v.x += zoom * vn.x;
+        v.y += zoom * vn.y;
+        v.z += zoom * vn.z;
+    }
 
     // Initialise GLFW
     if (!glfwInit()) {
