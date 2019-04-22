@@ -113,10 +113,9 @@ namespace std {
             // Compute individual hash values for first,
             // second and third and combine them using XOR
             // and bit shifting:
-
             size_t output = hash<Scalar>()(p[0]);
             for (uint i = 1; i < d; i++) {
-                output ^= hash<Scalar>()(p[i]);
+                output ^= (hash<Scalar>()(p[i]) << 1);
             }
             return output;
         }

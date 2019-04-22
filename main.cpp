@@ -32,18 +32,16 @@ using namespace glm;
 #include <set>
 #include <cassert>
 
-#include "fsh.hpp"
+#include "fsh/fsh.hpp"
 
 using std::cout, std::endl;
 
 int main(int argc, char** argv) {
-    tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
     std::string err;
-    std::string warn;
-    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
-                                "models/cube.obj");
+    bool ret =
+        tinyobj::LoadObj(shapes, materials, err, "models/suzanne.obj", NULL);
 
     if (!err.empty()) {
         std::cerr << err << std::endl;
@@ -56,61 +54,39 @@ int main(int argc, char** argv) {
     size_t voffset = 0;
     size_t noffset = 0;
 
-    float res = 0.025;
-    float precision = 0.01;
-    int nvertices = attrib.vertices.size();
-    int nindices = 0;
-    for (size_t s = 0; s < shapes.size(); s++) {
-        nindices += shapes[s].mesh.indices.size();
-    }
-
-    vx_mesh_t* mesh = vx_mesh_alloc(nvertices, nindices);
-
-    for (size_t s = 0; s < shapes.size(); s++) {
-        // Loop over faces(polygon)
-        size_t index_offset = 0;
-        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-            int fv = shapes[s].mesh.num_face_vertices[f];
-
-            // Loop over vertices in the face.
-            for (size_t v = 0; v < fv; v++) {
-                // access to vertex
-                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-                mesh->indices[index_offset + v] = idx.vertex_index;
-                mesh->normalindices[index_offset + v] = idx.normal_index;
-                mesh->vertices[idx.vertex_index].x =
-                    attrib.vertices[3 * idx.vertex_index + 0];
-                mesh->vertices[idx.vertex_index].y =
-                    attrib.vertices[3 * idx.vertex_index + 1];
-                mesh->vertices[idx.vertex_index].z =
-                    attrib.vertices[3 * idx.vertex_index + 2];
-                mesh->normals[idx.normal_index].x =
-                    attrib.normals[3 * idx.normal_index + 0];
-                mesh->normals[idx.normal_index].y =
-                    attrib.normals[3 * idx.normal_index + 1];
-                mesh->normals[idx.normal_index].z =
-                    attrib.normals[3 * idx.normal_index + 2];
-            }
-            index_offset += fv;
-
-            // per-face material
-            shapes[s].mesh.material_ids[f];
-        }
-    }
-
     std::vector<vx_vertex_t> vertexes;
     std::vector<vx_vec3_t> normals;
+    float res = 0.025;
+    float precision = 0.01;
 
-    vx_point_cloud_t* result = vx_voxelize_pc(mesh, res, res, res, precision);
+    for (size_t i = 0; i < shapes.size(); i++) {
+        vx_mesh_t* mesh;
 
-    printf("Number of vertices: %ld\n", result->nvertices);
-    for (int i = 0; i < result->nvertices; i++) {
-        vertexes.push_back(result->vertices[i]);
-        normals.push_back(result->normals[i]);
+        mesh = vx_mesh_alloc(shapes[i].mesh.positions.size(),
+                             shapes[i].mesh.indices.size());
+
+        for (size_t f = 0; f < shapes[i].mesh.indices.size(); f++) {
+            mesh->indices[f] = shapes[i].mesh.indices[f];
+        }
+        for (size_t v = 0; v < shapes[i].mesh.positions.size() / 3; v++) {
+            mesh->vertices[v].x = shapes[i].mesh.positions[3 * v + 0];
+            mesh->vertices[v].y = shapes[i].mesh.positions[3 * v + 1];
+            mesh->vertices[v].z = shapes[i].mesh.positions[3 * v + 2];
+        }
+
+        vx_point_cloud_t* result;
+        result = vx_voxelize_pc(mesh, res, res, res, precision);
+
+        for (int i = 0; i < result->nvertices; i++) {
+            vertexes.push_back(result->vertices[i]);
+            normals.push_back(result->normals[i]);
+        }
+
+        vx_point_cloud_free(result);
+        vx_mesh_free(mesh);
     }
 
-    vx_mesh_free(mesh);
-    vx_point_cloud_free(result);
+    printf("Number of vertices: %ld\n", vertexes.size());
 
     // int nv = vertexes.size();
     // for (int i = 0; i < nv; i++) {
@@ -126,9 +102,11 @@ int main(int argc, char** argv) {
     using pixel = bool;
     const uint d = 3;
     using PosInt = uint16_t;
+    using NorInt = int8_t;
     using HashInt = uint8_t;
-    using map = fsh::map<d, pixel, PosInt, HashInt>;
-    using point = fsh::point<d, PosInt>;
+    using map = fsh::map<d, pixel, PosInt, NorInt>;
+    using PosPoint = fsh::point<d, PosInt>;
+    using NorPoint = fsh::point<d, NorInt>;
     using IndexInt = uint64_t;
     int scale = 1 / res;
     int normalprec = 100;
@@ -145,38 +123,51 @@ int main(int argc, char** argv) {
     std::set<IndexInt> data_b;
 
     using std::round;
-    PosInt width = 0;
+    PosPoint boundings = {0, 0, 0};
     for (size_t i = 0; i < vertexes.size(); i++) {
         const vx_vertex_t& v = vertexes[i];
         const vx_vec3_t& vn = normals[i];
-        point p;
-        point n;
+        PosPoint p;
+        NorPoint n;
         for (uint i = 0; i < d; i++) {
             PosInt u = (v.v[i] - minVal) * scale;
-            width = max(width, u);
-            p.data[i] = u;
+            boundings[i] = max(boundings[i], u);
+            p[i] = u;
 
             PosInt w = vn.v[i] * normalprec;
-            n.data[i] = w;
+            n[i] = w;
         }
-        PosInt g = n.data[0];
+        NorInt g = std::abs(n[0]);
         for (uint i = 1; i < d; i++) {
-            g = std::__gcd(g, n.data[i]);
+            g = std::__gcd(g, (NorInt)std::abs(n[i]));
         }
         for (uint i = 0; i < d; i++) {
-            n.data[i] /= g;
+            n[i] /= g;
         }
         data.push_back(map::data_t{p, n, pixel{true}});
     }
-    width++;
+
     for (const auto& it : data) {
-        data_b.insert(fsh::point_to_index<d>(it.location, width, uint(-1)));
+        data_b.insert(fsh::point_to_index<d>(it.location, boundings + PosInt(1),
+                                             uint(-1)));
     }
+
+    map s([&](size_t i) { return data[i]; }, data.size());
+
+    // vertexes.clear();
+    // for (int i = 0; i < s.n; i++) {
+    //     vx_vertex_t v;
+    //     PosPoint p = s.temp[i].location;
+    //     for (int j = 0; j < d; j++) {
+    //         v.v[j] = 1.0 * p[j] / scale + minVal;
+    //     }
+    //     vertexes.push_back(v);
+    // }
 
     // use data
 
     // end fsh
-
+#if 0
     // Initialise GLFW
     if (!glfwInit()) {
         fprintf(stderr, "Failed to initialize GLFW\n");
@@ -287,6 +278,6 @@ int main(int argc, char** argv) {
 
     // Close OpenGL window and terminate GLFW
     glfwTerminate();
-
+#endif
     return 0;
 }

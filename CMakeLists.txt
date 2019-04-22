@@ -23,9 +23,9 @@ include_directories(
 	external/glfw-3.1.2/include/
 	external/glm-0.9.7.1/
 	external/glew-1.13.0/include/
-	/home/zsy/tbb/include
 	external/assimp-3.0.1270/include/
 	external/bullet-2.81-rev2613/src/
+	fsh/
 	.
 )
 
@@ -41,9 +41,10 @@ set(filelists
 
 add_executable(psh_proj
 	main.cpp
-	fsh.hpp
-	point.hpp
-	util.hpp
+	fsh/fsh.hpp
+	fsh/point.hpp
+	fsh/util.hpp
+	fsh/bitset.hpp
 	tiny_obj_loader.cpp
 	tiny_obj_loader.h
 	voxelizer.cpp
