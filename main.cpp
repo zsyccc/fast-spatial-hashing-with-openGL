@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
     std::vector<tinyobj::material_t> materials;
     std::string err;
     bool ret =
-        tinyobj::LoadObj(shapes, materials, err, "models/suzanne.obj", NULL);
+        tinyobj::LoadObj(shapes, materials, err, "models/cube.obj", NULL);
 
     if (!err.empty()) {
         std::cerr << err << std::endl;
@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
     using PosInt = uint16_t;
     using NorInt = int8_t;
     using HashInt = uint8_t;
-    using map = fsh::map<d, pixel, PosInt, NorInt>;
+    using map = fsh::map<d, pixel, PosInt, NorInt, uint8>;
     using PosPoint = fsh::point<d, PosInt>;
     using NorPoint = fsh::point<d, NorInt>;
     using IndexInt = uint64_t;
@@ -147,12 +147,37 @@ int main(int argc, char** argv) {
         data.push_back(map::data_t{p, n, pixel{true}});
     }
 
+    std::sort(data.begin(), data.end(),
+              [](const map::data_t& lhs, const map::data_t& rhs) {
+                  return lhs.location < rhs.location;
+              });
+    auto newend =
+        std::unique(data.begin(), data.end(),
+                    [](const map::data_t& lhs, const map::data_t& rhs) {
+                        return lhs.location == rhs.location;
+                    });
+    data.erase(newend, data.end());
     for (const auto& it : data) {
         data_b.insert(fsh::point_to_index<d>(it.location, boundings + PosInt(1),
                                              uint(-1)));
     }
 
     map s([&](size_t i) { return data[i]; }, data.size());
+
+    // std::cout << data_b.size() << ' ' << data.size() << std::endl;
+    // std::cout << data.size() - data_b.size() << std::endl;
+    // std::cout << s.box << std::endl;
+    // std::vector<PosPoint> vp;
+    // for (auto it : data) {
+    //     vp.push_back(it.location);
+    //     if (it.location == PosPoint{80, 66, 0}) {
+    //         std::cout << it.location << std::endl;
+    //     }
+    // }
+    // auto it = std::unique(vp.begin(), vp.end());
+
+    // std::cout << s.box << std::endl;
+    // cout << s.h(PosPoint{1, 0, 1}) << endl;
 
     // vertexes.clear();
     // for (int i = 0; i < s.n; i++) {

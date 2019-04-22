@@ -1,7 +1,10 @@
 #pragma once
 #ifndef FSH_POINT_HPP
 #define FSH_POINT_HPP
+
 #include <iostream>
+#include <cstring>
+
 namespace fsh {
     template <uint d, class Scalar>
     struct point {
@@ -79,19 +82,43 @@ namespace fsh {
         }
 
         template <class F>
+        friend point<d, F> operator+=(point& p, F other) {
+            return p = p + other;
+        }
+        friend point operator+=(point& lhs, const point& rhs) {
+            return lhs = lhs + rhs;
+        }
+        template <class F>
+        friend point<d, F> operator+=(point<d, Scalar>& lhs,
+                                      const point<d, F>& rhs) {
+            return lhs = lhs + rhs;
+        }
+
+        template <class F>
         friend point<d, F> operator-(const point& p, F other) {
             point<d, F> output = p;
             for (uint i = 0; i < d; i++) output[i] -= other;
             return output;
         }
-
-        friend bool operator==(const point& lhs, const point& rhs) {
+        friend bool operator<(const point& lhs, const point& rhs) {
             for (uint i = 0; i < d; i++)
-                if (lhs[i] != rhs[i]) return false;
-            return true;
+                if (lhs[i] != rhs[i]) return lhs[i] < rhs[i];
+            return false;
+        }
+        friend bool operator<=(const point& lhs, const point& rhs) {
+            return !(rhs < lhs);
+        }
+        friend bool operator>(const point& lhs, const point& rhs) {
+            return rhs < lhs;
+        }
+        friend bool operator>=(const point& lhs, const point& rhs) {
+            return !(lhs < rhs);
+        }
+        friend bool operator==(const point& lhs, const point& rhs) {
+            return !(rhs < lhs) && !(lhs < rhs);
         }
         friend bool operator!=(const point& lhs, const point& rhs) {
-            return !(lhs == rhs);
+            return lhs < rhs || rhs < lhs;
         }
 
         friend std::ostream& operator<<(std::ostream& stream, const point& p) {
@@ -102,6 +129,11 @@ namespace fsh {
             }
             stream << ")";
             return stream;
+        }
+        constexpr static point point_zero() {
+            point ret;
+            std::memset(ret.data, 0, sizeof(ret.data));
+            return ret;
         }
     };
 }  // namespace fsh
