@@ -41,6 +41,9 @@ set(filelists
 
 add_executable(psh_proj
 	main.cpp
+	fsh.hpp
+	point.hpp
+	util.hpp
 	tiny_obj_loader.cpp
 	tiny_obj_loader.h
 	voxelizer.cpp

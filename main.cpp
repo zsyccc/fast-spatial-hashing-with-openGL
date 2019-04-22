@@ -32,6 +32,8 @@ using namespace glm;
 #include <set>
 #include <cassert>
 
+#include "fsh.hpp"
+
 using std::cout, std::endl;
 
 int main(int argc, char** argv) {
@@ -110,15 +112,70 @@ int main(int argc, char** argv) {
     vx_mesh_free(mesh);
     vx_point_cloud_free(result);
 
-    int nv = vertexes.size();
-    for (int i = 0; i < nv; i++) {
-        vx_vertex_t& v = vertexes[i];
-        const vx_vec3_t& vn = normals[i];
-        float zoom = 0.2f;
-        v.x += zoom * vn.x;
-        v.y += zoom * vn.y;
-        v.z += zoom * vn.z;
+    // int nv = vertexes.size();
+    // for (int i = 0; i < nv; i++) {
+    //     vx_vertex_t& v = vertexes[i];
+    //     const vx_vec3_t& vn = normals[i];
+    //     float zoom = 0.2f;
+    //     v.x += zoom * vn.x;
+    //     v.y += zoom * vn.y;
+    //     v.z += zoom * vn.z;
+    // }
+
+    // begin fsh
+    using pixel = bool;
+    const uint d = 3;
+    using PosInt = uint16_t;
+    using HashInt = uint8_t;
+    using map = fsh::map<d, pixel, PosInt, HashInt>;
+    using point = fsh::point<d, PosInt>;
+    using IndexInt = uint64_t;
+    int scale = 1 / res;
+    int normalprec = 100;
+
+    // prepare data
+    float minVal = vertexes[0].x;
+    for (const auto& it : vertexes) {
+        for (const auto& u : it.v) {
+            minVal = min(u, minVal);
+        }
     }
+
+    std::vector<map::data_t> data;
+    std::set<IndexInt> data_b;
+
+    using std::round;
+    PosInt width = 0;
+    for (size_t i = 0; i < vertexes.size(); i++) {
+        const vx_vertex_t& v = vertexes[i];
+        const vx_vec3_t& vn = normals[i];
+        point p;
+        point n;
+        for (uint i = 0; i < d; i++) {
+            PosInt u = (v.v[i] - minVal) * scale;
+            width = max(width, u);
+            p.data[i] = u;
+
+            PosInt w = vn.v[i] * normalprec;
+            n.data[i] = w;
+        }
+        PosInt g = n.data[0];
+        for (uint i = 1; i < d; i++) {
+            g = std::__gcd(g, n.data[i]);
+        }
+        for (uint i = 0; i < d; i++) {
+            n.data[i] /= g;
+        }
+        data.push_back(map::data_t{p, n, pixel{true}});
+    }
+    width++;
+    for (const auto& it : data) {
+        data_b.insert(fsh::point_to_index<d>(it.location, width, uint(-1)));
+    }
+
+    // use data
+
+    // end fsh
 
     // Initialise GLFW
     if (!glfwInit()) {
@@ -176,7 +233,7 @@ int main(int argc, char** argv) {
     glGenBuffers(1, &vertexbuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertexes.size() * 3,
-                 &vertexes[0], GL_STATIC_DRAW);
+                 vertexes.data(), GL_STATIC_DRAW);
 
     do {
         // Clear the screen
