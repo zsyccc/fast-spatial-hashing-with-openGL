@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
     std::vector<tinyobj::material_t> materials;
     std::string err;
     bool ret =
-        tinyobj::LoadObj(shapes, materials, err, "models/bunny.obj", NULL);
+        tinyobj::LoadObj(shapes, materials, err, "models/fish_512.obj", NULL);
 
     if (!err.empty()) {
         std::cerr << err << std::endl;
@@ -149,21 +149,57 @@ int main(int argc, char** argv) {
     data.erase(newend, data.end());
 
     PosPoint border = boundings + PosInt(1);
+    IndexInt data_max_size = 1;
+    for (uint i = 0; i < d; i++) {
+        data_max_size *= border[i];
+    }
     for (const auto& it : data) {
         data_b.insert(fsh::point_to_index<d>(it.location, border, uint(-1)));
     }
 
-    map s([&](size_t i) { return data[i]; }, data.size());
+    std::cout << "data size: " << data.size() << std::endl;
+    std::cout << "data density: " << float(data.size()) / data_max_size
+              << std::endl;
 
-    s.get(PosPoint{61, 67, 43});
+    auto start_time = std::chrono::high_resolution_clock::now();
+    map s([&](size_t i) { return data[i]; }, data.size(), boundings);
+    auto stop_time = std::chrono::high_resolution_clock::now();
 
-    IndexInt num = 1;
-    for (uint i = 0; i < d; i++) {
-        num *= border[i];
-    }
+    auto original_data_size =
+        data_max_size * (sizeof(pixel) + sizeof(PosPoint));
+    std::cout << "original data: " << (original_data_size / (1024 * 1024.0f))
+              << " mb" << std::endl;
+
+    std::cout << "class size: " << s.memory_size() / (1024 * 1024.0f) << " mb"
+              << std::endl;
+
+    std::cout << "compression factor vs dense: "
+              << (float(s.memory_size()) / (data_max_size * sizeof(pixel)))
+              << std::endl;
+
+    std::cout << "compression factor vs sparse: "
+              << (float(s.memory_size()) /
+                  (sizeof(data) +
+                   (sizeof(decltype(data)::value_type) - sizeof(NorInt)) *
+                       data.size()))
+              << std::endl;
+    std::cout << "compression factor vs optimal: "
+              << (float(s.memory_size()) /
+                  (sizeof(data) + (sizeof(decltype(data)::value_type) -
+                                   sizeof(PosPoint) - sizeof(NorInt)) *
+                                      data.size()))
+              << std::endl;
+
+    std::cout << "map creation time: " << std::endl;
+    std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(
+                     stop_time - start_time)
+                         .count() /
+                     1000.0f
+              << " seconds" << std::endl;
+
 #if 1
     std::cout << "exhaustive test" << std::endl;
-    for (IndexInt i = 0; i < num; i++) {
+    for (IndexInt i = 0; i < data_max_size; i++) {
         PosPoint p = fsh::index_to_point<d>(i, border, IndexInt(-1));
         pixel exists = data_b.count(i);
         try {
@@ -188,7 +224,8 @@ int main(int argc, char** argv) {
     // using data
 #if 1
     vertexes.clear();
-    for (IndexInt i = 0; i < num; i++) {
+    cout << "Reading data" << endl;
+    for (IndexInt i = 0; i < data_max_size; i++) {
         PosPoint p = fsh::index_to_point<d>(i, border, IndexInt(-1));
         try {
             s.get(p);
@@ -200,6 +237,7 @@ int main(int argc, char** argv) {
         } catch (const std::out_of_range& e) {
         }
     }
+    cout << "End reading" << endl;
 
     vx_vertex_t bound_min = vertexes[0];
     vx_vertex_t bound_max = vertexes[0];

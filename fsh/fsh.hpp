@@ -67,16 +67,17 @@ namespace fsh {
         };
         using data_function = std::function<data_t(IndexInt)>;
 
-        map(const data_function& data, IndexInt n) : n(n), offset(0) {
-            for (int i = 0; i < d; i++) {
-                box[i] = 0;
-            }
-            for (int i = 0; i < n; i++) {
-                const data_t& it = data(i);
-                for (int i = 0; i < d; i++) {
-                    box[i] = std::max(box[i], it.location[i]);
-                }
-            }
+        map(const data_function& data, IndexInt n, point<d, PosInt> box)
+            : n(n), offset(0), box(box) {
+            // for (int i = 0; i < d; i++) {
+            //     box[i] = 0;
+            // }
+            // for (int i = 0; i < n; i++) {
+            //     const data_t& it = data(i);
+            //     for (int i = 0; i < d; i++) {
+            //         box[i] = std::max(box[i], it.location[i]);
+            //     }
+            // }
             while (hash_table_size() < n) {
                 box = box + (PosInt)(2 * d);
                 offset += d;
@@ -124,6 +125,19 @@ namespace fsh {
                     NOT_FOUND_EXCEPTION();
                 }
             }
+        }
+
+        size_t memory_size() const {
+            size_t ret = sizeof(*this);
+            for (uint i = 0; i < d; i++) {
+                ret += normal_indices[i][0].memory_size() *
+                       normal_indices[i].capacity();
+            }
+            ret += sizeof(typename decltype(normals)::value_type) *
+                   normals.capacity();
+            ret += sizeof(typename decltype(H)::value_type) * H.capacity();
+            ret += sizeof(typename decltype(phi)::value_type) * phi.capacity();
+            return ret;
         }
 
     private:

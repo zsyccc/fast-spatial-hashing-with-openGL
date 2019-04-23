@@ -16,6 +16,10 @@ namespace fsh {
         size_t data_size;
 
     public:
+        size_t memory_size() const {
+            return sizeof(*this) + sizeof(typename decltype(data)::value_type) *
+                                       data.capacity();
+        }
         bitset() : size(0) {}
         bitset(size_t size)
             : size(size),
