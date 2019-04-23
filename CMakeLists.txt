@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(psh_proj)
+project(fsh)
 
 find_package(OpenGL REQUIRED)
 
@@ -39,7 +39,7 @@ set(filelists
 	models/suzanne.obj
 )
 
-add_executable(psh_proj
+add_executable(fsh
 	main.cpp
 	fsh/fsh.hpp
 	fsh/point.hpp
@@ -60,8 +60,10 @@ add_executable(psh_proj
 )
 
 add_definitions(
-	-DNDEBUG
+	# -DNDEBUG
+	-DDEBUG
 	-D_CONSOLE
+	# -Og
 	-g
 )
 

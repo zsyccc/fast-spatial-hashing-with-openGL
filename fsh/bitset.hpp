@@ -11,18 +11,19 @@ namespace fsh {
     class bitset {
     private:
         using scaler = uint8_t;
-        std::vector<scaler> data;
         size_t size;
+        std::vector<scaler> data;
         size_t data_size;
 
     public:
         bitset() : size(0) {}
         bitset(size_t size)
             : size(size),
-              data(std::ceil(1.0 * size / BIT_CAPACITY(scaler)), 0) {
-            data_size = data.size();
+              data(std::ceil(1.0 * size / BIT_CAPACITY(scaler)), 0),
+              data_size(data.size()) {
+            // data_size = data.size();
         }
-        bitset& add(int k) {
+        bitset& add(size_t k) {
             if (k >= size) {
                 std::cout << "error in bitset: add" << std::endl;
                 return *this;
@@ -32,7 +33,7 @@ namespace fsh {
             data[pos] |= ((scaler)1 << cur);
             return *this;
         }
-        bitset& sub(int k) {
+        bitset& sub(size_t k) {
             if (k >= size) {
                 std::cout << "error in bitset: sub" << std::endl;
                 return *this;
@@ -42,7 +43,7 @@ namespace fsh {
             data[pos] &= ((scaler)-1 ^ ((scaler)1 << cur));
             return *this;
         }
-        bitset operator&(const bitset& rhs) {
+        bitset operator&(const bitset& rhs) const {
             bitset ret(size);
             if (size != rhs.size) {
                 std::cout << "error in bitset: &" << std::endl;
@@ -53,6 +54,7 @@ namespace fsh {
             }
             return ret;
         }
+        bitset operator&=(const bitset& rhs) { return *this = (*this & rhs); }
         int find_fist() const {
             int ret = -1;
             for (size_t i = 0; i < data_size && ret == -1; i++) {

@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
     std::vector<tinyobj::material_t> materials;
     std::string err;
     bool ret =
-        tinyobj::LoadObj(shapes, materials, err, "models/cube.obj", NULL);
+        tinyobj::LoadObj(shapes, materials, err, "models/bunny.obj", NULL);
 
     if (!err.empty()) {
         std::cerr << err << std::endl;
@@ -88,23 +88,13 @@ int main(int argc, char** argv) {
 
     printf("Number of vertices: %ld\n", vertexes.size());
 
-    // int nv = vertexes.size();
-    // for (int i = 0; i < nv; i++) {
-    //     vx_vertex_t& v = vertexes[i];
-    //     const vx_vec3_t& vn = normals[i];
-    //     float zoom = 0.2f;
-    //     v.x += zoom * vn.x;
-    //     v.y += zoom * vn.y;
-    //     v.z += zoom * vn.z;
-    // }
-
     // begin fsh
     using pixel = bool;
     const uint d = 3;
     using PosInt = uint16_t;
     using NorInt = int8_t;
     using HashInt = uint8_t;
-    using map = fsh::map<d, pixel, PosInt, NorInt, uint8>;
+    using map = fsh::map<d, pixel, PosInt, NorInt, HashInt>;
     using PosPoint = fsh::point<d, PosInt>;
     using NorPoint = fsh::point<d, NorInt>;
     using IndexInt = uint64_t;
@@ -157,42 +147,73 @@ int main(int argc, char** argv) {
                         return lhs.location == rhs.location;
                     });
     data.erase(newend, data.end());
+
+    PosPoint border = boundings + PosInt(1);
     for (const auto& it : data) {
-        data_b.insert(fsh::point_to_index<d>(it.location, boundings + PosInt(1),
-                                             uint(-1)));
+        data_b.insert(fsh::point_to_index<d>(it.location, border, uint(-1)));
     }
 
     map s([&](size_t i) { return data[i]; }, data.size());
 
-    // std::cout << data_b.size() << ' ' << data.size() << std::endl;
-    // std::cout << data.size() - data_b.size() << std::endl;
-    // std::cout << s.box << std::endl;
-    // std::vector<PosPoint> vp;
-    // for (auto it : data) {
-    //     vp.push_back(it.location);
-    //     if (it.location == PosPoint{80, 66, 0}) {
-    //         std::cout << it.location << std::endl;
-    //     }
-    // }
-    // auto it = std::unique(vp.begin(), vp.end());
-
-    // std::cout << s.box << std::endl;
-    // cout << s.h(PosPoint{1, 0, 1}) << endl;
-
-    // vertexes.clear();
-    // for (int i = 0; i < s.n; i++) {
-    //     vx_vertex_t v;
-    //     PosPoint p = s.temp[i].location;
-    //     for (int j = 0; j < d; j++) {
-    //         v.v[j] = 1.0 * p[j] / scale + minVal;
-    //     }
-    //     vertexes.push_back(v);
-    // }
-
-    // use data
-
+#if 1
+    std::cout << "exhaustive test" << std::endl;
+    IndexInt num = 1;
+    for (uint i = 0; i < d; i++) {
+        num *= border[i];
+    }
+    for (IndexInt i = 0; i < num; i++) {
+        PosPoint p = fsh::index_to_point<d>(i, border, IndexInt(-1));
+        pixel exists = data_b.count(i);
+        try {
+            s.get(p);
+            if (!exists) {
+                std::cout << "found non-existing element!" << std::endl;
+                std::cout << i << std::endl;
+                std::cout << p << std::endl;
+            }
+        } catch (const std::out_of_range& e) {
+            if (exists) {
+                std::cout << "didn't find existing element!" << std::endl;
+                std::cout << i << std::endl;
+                std::cout << p << std::endl;
+            }
+        }
+    }
+    std::cout << "finished!" << std::endl;
+#endif
     // end fsh
-#if 0
+
+    // using data
+    vertexes.clear();
+    for (IndexInt i = 0; i < num; i++) {
+        PosPoint p = fsh::index_to_point<d>(i, border, IndexInt(-1));
+        try {
+            s.get(p);
+            vx_vertex_t vt;
+            for (uint j = 0; j < d; j++) {
+                vt.v[j] = 1.0f * p[j] / scale + minVal;
+            }
+            vertexes.push_back(vt);
+        } catch (const std::out_of_range& e) {
+        }
+    }
+
+    vx_vertex_t bound_min = vertexes[0];
+    vx_vertex_t bound_max = vertexes[0];
+    for (const auto& it : vertexes) {
+        for (uint i = 0; i < d; i++) {
+            bound_min.v[i] = std::min(bound_min.v[i], it.v[i]);
+            bound_max.v[i] = std::max(bound_max.v[i], it.v[i]);
+            // cout << it.v[i] << ' ';
+        }
+        // cout << endl;
+    }
+    vx_vertex_t center;
+    for (uint i = 0; i < d; i++) {
+        center.v[i] = (bound_max.v[i] + bound_min.v[i]) / 2;
+    }
+
+#if 1
     // Initialise GLFW
     if (!glfwInit()) {
         fprintf(stderr, "Failed to initialize GLFW\n");
@@ -261,9 +282,9 @@ int main(int argc, char** argv) {
         glm::mat4 ProjectionMatrix = getProjectionMatrix();
         glm::mat4 ViewMatrix = getViewMatrix();
         glm::mat4 ModelMatrix = glm::mat4(1.0);
-        // ModelMatrix[3][0] = -center.x;
-        // ModelMatrix[3][1] = -center.y;
-        // ModelMatrix[3][2] = -center.z;
+        ModelMatrix[3][0] = -center.x;
+        ModelMatrix[3][1] = -center.y;
+        ModelMatrix[3][2] = -center.z;
         glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
 
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
