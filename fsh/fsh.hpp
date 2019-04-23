@@ -15,10 +15,15 @@
 
 #define VALUE(x) std::cout << #x "=" << x << std::endl
 
+#define NOT_FOUND_EXCEPTION() \
+    throw std::out_of_range("Element not found in map")
+
 namespace fsh {
     // creates a perfect hash for a predefined data set
     // d is the dimensionality, T is the data type
     // PosInt is the integer type used for positions
+    // NorInt is the integer type used for normal vectors
+    // HashInt is the integer type used for handling collisions
     template <uint d, class T, class PosInt, class NorInt, class HashInt>
     class map {
     private:
@@ -46,6 +51,7 @@ namespace fsh {
         // hash table
         std::vector<entry> H;
 
+        // redirct table
         std::vector<redirct_entry> phi;
 
     public:
@@ -79,6 +85,43 @@ namespace fsh {
             while (!create(data)) {
                 box = box + (PosInt)(2 * d);
                 offset += d;
+            }
+        }
+
+        const T& get(const point<d, PosInt>& p) const { return get(p); }
+
+        T& get(const point<d, PosInt>& p) {
+            for (uint i = 0; i < d; i++) {
+                if (p[i] >= normal_indices[i].size()) {
+                    NOT_FOUND_EXCEPTION();
+                }
+            }
+            int index = get_normal_index(p);
+            if (index == -1) {
+                NOT_FOUND_EXCEPTION();
+            }
+            const point<d, NorInt>& vn = normals[index];
+            point<d, PosInt> surface_point = p;
+            PosInt dist = move_to_box(surface_point, vn);
+            size_t H_index = h(surface_point);
+            entry& en = H[H_index];
+            if (en.redirct_index == 0) {
+                if (en.redirected == false && en.equals(vn, dist)) {
+                    return en.contents;
+                } else {
+                    NOT_FOUND_EXCEPTION();
+                }
+            } else {
+                size_t R_index = en.redirct_index - 1;
+                const redirct_entry& re = phi[R_index];
+                H_index = re.redirect[re.h(vn, dist)];
+                if (H_index == 0) NOT_FOUND_EXCEPTION();
+                entry& en2 = H[H_index];
+                if (en2.equals(vn, dist)) {
+                    return en2.contents;
+                } else {
+                    NOT_FOUND_EXCEPTION();
+                }
             }
         }
 
@@ -372,44 +415,6 @@ namespace fsh {
                 bit &= normal_indices[i][p[i]];
             }
             return bit.find_fist();
-        }
-
-    public:
-        const T& get(const point<d, PosInt>& p) const { return get(p); }
-        T& get(const point<d, PosInt>& p) {
-            for (uint i = 0; i < d; i++) {
-                if (p[i] >= normal_indices[i].size()) {
-                    throw std::out_of_range("Element not found in map");
-                }
-            }
-            int index = get_normal_index(p);
-            if (index == -1) {
-                throw std::out_of_range("Element not found in map");
-            }
-            const point<d, NorInt>& vn = normals[index];
-            point<d, PosInt> surface_point = p;
-            PosInt dist = move_to_box(surface_point, vn);
-            size_t H_index = h(surface_point);
-            entry& en = H[H_index];
-            if (en.redirct_index == 0) {
-                if (en.redirected == false && en.equals(vn, dist)) {
-                    return en.contents;
-                } else {
-                    throw std::out_of_range("Element not found in map");
-                }
-            } else {
-                size_t R_index = en.redirct_index - 1;
-                const redirct_entry& re = phi[R_index];
-                H_index = re.redirect[re.h(vn, dist)];
-                if (H_index == 0)
-                    throw std::out_of_range("Element not found in map");
-                entry& en2 = H[H_index];
-                if (en2.equals(vn, dist)) {
-                    return en2.contents;
-                } else {
-                    throw std::out_of_range("Element not found in map");
-                }
-            }
         }
     };
 }  // namespace fsh
