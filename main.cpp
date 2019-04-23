@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
     std::vector<tinyobj::material_t> materials;
     std::string err;
     bool ret =
-        tinyobj::LoadObj(shapes, materials, err, "models/fish_512.obj", NULL);
+        tinyobj::LoadObj(shapes, materials, err, "models/bunny.obj", NULL);
 
     if (!err.empty()) {
         std::cerr << err << std::endl;
@@ -150,15 +150,17 @@ int main(int argc, char** argv) {
 
     PosPoint border = boundings + PosInt(1);
     IndexInt data_max_size = 1;
+    PosInt width = 0;
     for (uint i = 0; i < d; i++) {
         data_max_size *= border[i];
+        width = max(border[i], width);
     }
     for (const auto& it : data) {
         data_b.insert(fsh::point_to_index<d>(it.location, border, uint(-1)));
     }
 
     std::cout << "data size: " << data.size() << std::endl;
-    std::cout << "data density: " << float(data.size()) / data_max_size
+    std::cout << "data density: " << float(data.size()) / std::pow(width, d)
               << std::endl;
 
     auto start_time = std::chrono::high_resolution_clock::now();
@@ -166,7 +168,7 @@ int main(int argc, char** argv) {
     auto stop_time = std::chrono::high_resolution_clock::now();
 
     auto original_data_size =
-        data_max_size * (sizeof(pixel) + sizeof(PosPoint));
+        width * width * width * (sizeof(pixel) + sizeof(PosInt));
     std::cout << "original data: " << (original_data_size / (1024 * 1024.0f))
               << " mb" << std::endl;
 
@@ -174,7 +176,8 @@ int main(int argc, char** argv) {
               << std::endl;
 
     std::cout << "compression factor vs dense: "
-              << (float(s.memory_size()) / (data_max_size * sizeof(pixel)))
+              << (float(s.memory_size()) /
+                  (uint(std::pow(width, 3)) * sizeof(pixel)))
               << std::endl;
 
     std::cout << "compression factor vs sparse: "
