@@ -67,8 +67,8 @@ namespace fsh {
         };
         using data_function = std::function<data_t(IndexInt)>;
 
-        map(const data_function& data, IndexInt n, point<d, PosInt> box)
-            : n(n), offset(0), box(box) {
+        map(const data_function& data, IndexInt _n, point<d, PosInt> _box)
+            : n(_n), offset(0), box(_box) {
             // for (int i = 0; i < d; i++) {
             //     box[i] = 0;
             // }
