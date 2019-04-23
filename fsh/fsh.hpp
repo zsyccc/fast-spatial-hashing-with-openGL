@@ -85,6 +85,7 @@ namespace fsh {
             while (!create(data)) {
                 box = box + (PosInt)(2 * d);
                 offset += d;
+                VALUE(box);
             }
         }
 
@@ -176,15 +177,15 @@ namespace fsh {
         // };
 
         struct redirct_entry {
-            std::vector<PosInt> redirect;
+            std::vector<size_t> redirect;
             HashInt k;
             redirct_entry() : k(1) {}
             static HashInt h(const entry_verify& verify, HashInt k) {
-                PosInt u = 0;
-                PosInt mul = 1;
+                size_t u = 0;
+                size_t mul = 1;
                 for (uint i = 0; i < d; i++) {
                     u += verify.normal[i] * mul;
-                    mul *= 17;
+                    mul *= 3145739;
                 }
                 u += verify.distance * mul;
                 return u % k;
@@ -261,10 +262,9 @@ namespace fsh {
         }
         PosInt move_to_box(point<d, PosInt>& v,
                            const point<d, NorInt>& vn) const {
-            // if (on_box(v)) return 0;
             PosInt maxbox = std::max(box[0], std::max(box[1], box[2]));
             double len = maxbox;
-            v = v + offset;
+            v += offset;
             for (uint i = 0; i < d; i++) {
                 double move = len;
                 if (vn[i] > 0) {
@@ -278,7 +278,7 @@ namespace fsh {
                 v[i] += std::round(len * vn[i]);
             }
             assert(on_box(v));
-            return (PosInt)std::round(len * ((unsigned)PosInt(-1) >> 3));
+            return (PosInt)std::round(len * ((unsigned)PosInt(-1) >> 4));
         }
         constexpr size_t find_surface(const point<d, PosInt>& v) const {
             int ret = 0;
@@ -362,7 +362,6 @@ namespace fsh {
                         redirect_hat[index] = redirct_entry_large(index);
                         redirect_hat[index]
                             .redirect_table[H_hat[index].verify] = index;
-                        // std::cout << H_hat[index].location << std::endl;
                     }
                     // std::cout << it.location << std::endl;
                     entry_verify verify(it.normal, it.distance);

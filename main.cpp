@@ -56,8 +56,8 @@ int main(int argc, char** argv) {
 
     std::vector<vx_vertex_t> vertexes;
     std::vector<vx_vec3_t> normals;
-    float res = 0.025;
-    float precision = 0.01;
+    float res = 0.0025;
+    float precision = 0.001;
 
     for (size_t i = 0; i < shapes.size(); i++) {
         vx_mesh_t* mesh;
@@ -120,11 +120,11 @@ int main(int argc, char** argv) {
         PosPoint p;
         NorPoint n;
         for (uint i = 0; i < d; i++) {
-            PosInt u = (v.v[i] - minVal) * scale;
+            PosInt u = std::round((v.v[i] - minVal) * scale);
             boundings[i] = max(boundings[i], u);
             p[i] = u;
 
-            PosInt w = vn.v[i] * normalprec;
+            PosInt w = std::round(vn.v[i] * normalprec);
             n[i] = w;
         }
         NorInt g = std::abs(n[0]);
@@ -155,12 +155,14 @@ int main(int argc, char** argv) {
 
     map s([&](size_t i) { return data[i]; }, data.size());
 
-#if 1
-    std::cout << "exhaustive test" << std::endl;
+    s.get(PosPoint{61, 67, 43});
+
     IndexInt num = 1;
     for (uint i = 0; i < d; i++) {
         num *= border[i];
     }
+#if 1
+    std::cout << "exhaustive test" << std::endl;
     for (IndexInt i = 0; i < num; i++) {
         PosPoint p = fsh::index_to_point<d>(i, border, IndexInt(-1));
         pixel exists = data_b.count(i);
@@ -184,6 +186,7 @@ int main(int argc, char** argv) {
     // end fsh
 
     // using data
+#if 1
     vertexes.clear();
     for (IndexInt i = 0; i < num; i++) {
         PosPoint p = fsh::index_to_point<d>(i, border, IndexInt(-1));
@@ -213,7 +216,6 @@ int main(int argc, char** argv) {
         center.v[i] = (bound_max.v[i] + bound_min.v[i]) / 2;
     }
 
-#if 1
     // Initialise GLFW
     if (!glfwInit()) {
         fprintf(stderr, "Failed to initialize GLFW\n");

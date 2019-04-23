@@ -100,6 +100,9 @@ namespace fsh {
             for (uint i = 0; i < d; i++) output[i] -= other;
             return output;
         }
+
+        friend point operator-(const point& p) { return Scalar(-1) * p; }
+
         friend bool operator<(const point& lhs, const point& rhs) {
             for (uint i = 0; i < d; i++)
                 if (lhs[i] != rhs[i]) return lhs[i] < rhs[i];
